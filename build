@@ -1,0 +1,81 @@
+#!/bin/bash
+
+# 获取脚本所在的根目录
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ALGO_DIR="$ROOT_DIR/Algorithm_learning"
+BUILD_DIR="$ALGO_DIR/build"
+
+# 1. 处理 clean / clear 清理指令
+if [ "$1" = "clean" ] || [ "$1" = "clear" ]; then
+    echo "正在清理 Algorithm_learning 目录下的 build 文件夹和所有 .exe 文件..."
+    rm -rf "$BUILD_DIR" 2>/dev/null
+    rm -f "$ALGO_DIR"/*.exe 2>/dev/null
+    rm -f "$ALGO_DIR"/*.out 2>/dev/null
+    echo "清理完成！"
+    exit 0
+fi
+
+# 2. 检查是否传入了文件名
+if [ -z "$1" ]; then
+    echo "错误：请指定要编译的 C 文件名称！"
+    echo "用法: ./build <文件名>  或者  ./build clean"
+    echo "示例: ./build test1"
+    exit 1
+fi
+
+# 3. 解析输入的文件名（兼容带或不带 .c 后缀）
+INPUT_FILE="$1"
+if [[ "$INPUT_FILE" != *.c ]]; then
+    SRC_FILE="${INPUT_FILE}.c"
+else
+    SRC_FILE="$INPUT_FILE"
+fi
+
+# 检查源文件在 Algorithm_learning 目录下是否存在
+FULL_SRC_PATH="$ALGO_DIR/$SRC_FILE"
+if [ ! -f "$FULL_SRC_PATH" ]; then
+    echo "错误：找不到源文件 '$FULL_SRC_PATH'！"
+    exit 1
+fi
+
+# 4. 在 Algorithm_learning/build 目录下进行编译
+if [ ! -d "$BUILD_DIR" ]; then
+    mkdir -p "$BUILD_DIR"
+fi
+
+cd "$BUILD_DIR" || exit 1
+
+# 5. 调用 Algorithm_learning 目录下的 CMake
+echo "正在配置 CMake (编译目标: $SRC_FILE) ..."
+cmake -DCMAKE_BUILD_TYPE=Debug \
+      -DTARGET_FILE="../$SRC_FILE" \
+      ..
+
+if [ $? -ne 0 ]; then
+    echo "CMake 配置失败！"
+    exit 1
+fi
+
+echo "正在编译 ..."
+cmake --build .
+
+# 6. 将生成的可执行文件复制到 Algorithm_learning 根目录下，方便直接运行
+if [ $? -eq 0 ]; then
+    # 兼容不同系统下生成的可执行文件名字和路径
+    # 提取纯文件名（不带 .c）
+    PURE_NAME=$(basename "$SRC_FILE" .c)
+    
+    if [ -f "Debug/$PURE_NAME.exe" ]; then
+        cp "Debug/$PURE_NAME.exe" "$ALGO_DIR/"
+    elif [ -f "$PURE_NAME.exe" ]; then
+        cp "$PURE_NAME.exe" "$ALGO_DIR/"
+    elif [ -f "$PURE_NAME" ]; then
+        cp "$PURE_NAME" "$ALGO_DIR/"
+    fi
+
+    echo "----------------------------------------"
+    echo "编译成功！可执行文件已就绪: Algorithm_learning/$PURE_NAME"
+else
+    echo "编译失败，请检查代码。"
+    exit 1
+fi
